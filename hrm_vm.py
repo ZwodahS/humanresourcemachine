@@ -31,11 +31,26 @@ class Inbox(SingletonInstruction):
     """
     NAME = "INBOX"
 
+    def run(self, machine):
+        if len(machine.inbox) == 0:
+            return -1
+
+        value = machine.inbox.pop()
+        machine.current_cache = value
+        return None
+
 
 class Outbox(SingletonInstruction):
     """The outbox instruction
     """
     NAME = "OUTBOX"
+
+    def run(self, machine):
+        if machine.current_cache is None:
+            raise MachineException(message="Unable to outbox empty value")
+        machine.outbox.append(machine.current_cache)
+        machine.current_cache = None
+        return None
 
 
 class MemoryValueInstruction(Instruction):
@@ -70,6 +85,20 @@ class CopyFrom(MemoryValueInstruction):
         self.value = value
         self.is_memory = is_memory
 
+    def run(self, machine):
+        if self.value is None or self.value >= len(machine.memory):
+            raise MachineException(message="Memory index out of bound")
+        if self.is_memory:
+            mem_pos = machine.memory[self.value]
+        else:
+            mem_pos = self.value
+        if mem_pos is None:
+            raise MachineException(message="Unable to access empty value memory")
+        if mem_pos >= len(machine.memory) or mem_pos < 0:
+            raise MachineException(message="Memory index out of bound")
+
+        machine.current_cache = machine.memory[mem_pos]
+        return None
 
 class CopyTo(MemoryValueInstruction):
     """The copyto command
@@ -79,6 +108,23 @@ class CopyTo(MemoryValueInstruction):
     def __init__(self, value, is_memory):
         self.value = value
         self.is_memory = is_memory
+
+    def run(self, machine):
+        if machine.current_cache is None:
+            raise MachineException(message="Unable to copy empty value to memory")
+        if self.value is None or self.value >= len(machine.memory):
+            raise MachineException(message="Memory index out of bound")
+        if self.is_memory:
+            mem_pos = machine.memory[self.value]
+        else:
+            mem_pos = self.value
+        if mem_pos is None:
+            raise MachineException(message="Unable to access empty value memory")
+        if mem_pos >= len(machine.memory) or mem_pos < 0:
+            raise MachineException(message="Memory index out of bound")
+
+        machine.memory[mem_pos] = machine.current_cache
+        return None
 
 
 class Add(MemoryValueInstruction):
@@ -90,6 +136,22 @@ class Add(MemoryValueInstruction):
         self.value = value
         self.is_memory = is_memory
 
+    def run(self, machine):
+        if machine.current_cache is None:
+            raise MachineException(message="Unable to copy empty value to memory")
+        if self.value is None or self.value >= len(machine.memory):
+            raise MachineException(message="Memory index out of bound")
+        if self.is_memory:
+            mem_pos = machine.memory[self.value]
+        else:
+            mem_pos = self.value
+        if mem_pos is None:
+            raise MachineException(message="Unable to access empty value memory")
+        if mem_pos >= len(machine.memory) or mem_pos < 0:
+            raise MachineException(message="Memory index out of bound")
+
+        machine.current_cache += machine.memory[mem_pos]
+
 
 class Sub(MemoryValueInstruction):
     """The sub instruction
@@ -99,6 +161,22 @@ class Sub(MemoryValueInstruction):
     def __init__(self, value, is_memory):
         self.value = value
         self.is_memory = is_memory
+
+    def run(self, machine):
+        if machine.current_cache is None:
+            raise MachineException(message="Unable to copy empty value to memory")
+        if self.value is None or self.value >= len(machine.memory):
+            raise MachineException(message="Memory index out of bound")
+        if self.is_memory:
+            mem_pos = machine.memory[self.value]
+        else:
+            mem_pos = self.value
+        if mem_pos is None:
+            raise MachineException(message="Unable to access empty value memory")
+        if mem_pos >= len(machine.memory) or mem_pos < 0:
+            raise MachineException(message="Memory index out of bound")
+
+        machine.current_cache == machine.memory[mem_pos]
 
 
 class BumpUp(MemoryValueInstruction):
@@ -110,6 +188,21 @@ class BumpUp(MemoryValueInstruction):
         self.value = value
         self.is_memory = is_memory
 
+    def run(self, machine):
+        if self.value is None or self.value >= len(machine.memory):
+            raise MachineException(message="Memory index out of bound")
+        if self.is_memory:
+            mem_pos = machine.memory[self.value]
+        else:
+            mem_pos = self.value
+        if mem_pos is None:
+            raise MachineException(message="Unable to access empty value memory")
+        if mem_pos >= len(machine.memory) or mem_pos < 0:
+            raise MachineException(message="Memory index out of bound")
+
+        machine.memory[mem_pos] += 1
+        machine.current_cache = machine.memory[mem_pos]
+
 
 class BumpDown(MemoryValueInstruction):
     """The bump down instruction
@@ -119,6 +212,21 @@ class BumpDown(MemoryValueInstruction):
     def __init__(self, value, is_memory):
         self.value = value
         self.is_memory = is_memory
+
+    def run(self, machine):
+        if self.value is None or self.value >= len(machine.memory):
+            raise MachineException(message="Memory index out of bound")
+        if self.is_memory:
+            mem_pos = machine.memory[self.value]
+        else:
+            mem_pos = self.value
+        if mem_pos is None:
+            raise MachineException(message="Unable to access empty value memory")
+        if mem_pos >= len(machine.memory) or mem_pos < 0:
+            raise MachineException(message="Memory index out of bound")
+
+        machine.memory[mem_pos] -= 1
+        machine.current_cache = machine.memory[mem_pos]
 
 
 class LabelInstruction(Instruction):
@@ -139,6 +247,9 @@ class Jump(LabelInstruction):
         self.label = label
         self.line = -1
 
+    def run(self, machine):
+        return self.line
+
 
 class JumpZ(LabelInstruction):
     """The Jump if zero instruction
@@ -149,6 +260,12 @@ class JumpZ(LabelInstruction):
         self.label = label
         self.line = -1
 
+    def run(self, machine):
+        if machine.current_cache is None:
+            raise MachineException(message="Unable to compare empty value")
+        if machine.current_cache == 0:
+            return self.line
+        return None
 
 class JumpN(LabelInstruction):
     """The Jump if negative instruction
@@ -158,6 +275,13 @@ class JumpN(LabelInstruction):
     def __init__(self, label):
         self.label = label
         self.line = -1
+
+    def run(self, machine):
+        if machine.current_cache is None:
+            raise MachineException(message="Unable to compare empty value")
+        if machine.current_cache < 0:
+            return self.line
+        return None
 
 
 AVAILABLE_COMMANDS = [ Inbox, Outbox, CopyFrom, CopyTo, Add, Sub, BumpUp, BumpDown, Jump, JumpZ, JumpN ]
@@ -198,7 +322,49 @@ def parse_commands(commands):
 
     return parsed_commands
 
+
+class MachineException(Exception):
+
+    def __init__(self, message):
+        super().__init__(message)
+
+
+def is_valid_value(value):
+    if isinstance(value, int):
+        return True
+    if isinstance(value, str) and len(value) == 1:
+        return True
+    return False
+
+
+class Machine(object):
+
+    def __init__(self, memory_size, input, starting_memory=None):
+        self.memory = [ None ] * memory_size
+        self.inbox = list(reversed(input))
+        self.outbox = []
+        self.current_cache = None
+        if starting_memory is not None:
+            for mem_pos, value in starting_memory.items():
+                if mem_pos < 0 or mem_pos >= len(self.memory):
+                    raise MachineException(message="Starting memory out of index")
+                self.memory[mem_pos] = value
+
+    def run_commands(self, commands):
+        current_instruction = 0
+        while current_instruction >= 0  and current_instruction < len(commands):
+            next_instruction = commands[current_instruction].run(machine)
+            if next_instruction is None:
+                current_instruction += 1
+            else:
+                current_instruction = next_instruction
+
+
+
 if __name__ == "__main__":
     with open(sys.argv[1]) as f:
         commands = f.readlines()
     parsed_commands = parse_commands(commands)
+    machine = Machine(8, input=[1, 2, 3, 4])
+    machine.run_commands(parsed_commands)
+    print(machine.outbox)
